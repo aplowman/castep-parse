@@ -25,7 +25,7 @@ def get_version():
 def get_long_description():
 
     readme_file = 'README.md'
-    with open(readme_file) as handle:
+    with open(readme_file, encoding='utf-8') as handle:
         contents = handle.read()
 
     return contents
