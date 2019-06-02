@@ -9,7 +9,7 @@ Input file writers and output file readers for the density functional theory cod
 
 This code has generally been used for `task=singlepoint` and `task=geometryoptimisation` simulations. Consequently, input and output files associated with other simulation types are not yet supported.
 
-## Roadmap
+## Functionality
 
 ### Readers:
 
