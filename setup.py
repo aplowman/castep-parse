@@ -22,11 +22,22 @@ def get_version():
     return ver_str
 
 
+def get_long_description():
+
+    readme_file = 'README.md'
+    with open(readme_file) as handle:
+        contents = handle.read()
+
+    return contents
+
+
 setup(
     name='castep-parse',
     version=get_version(),
     description=('Input file writers and output file parsers for the density '
                  'functional theory code CASTEP.'),
+    long_description=get_long_description(),
+    long_description_content_type='text/markdown',
     author='Adam J. Plowman',
     author_email='adam.plowman@manchester.ac.uk',
     packages=find_packages(),
