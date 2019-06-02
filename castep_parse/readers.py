@@ -5,10 +5,13 @@ from warnings import warn
 
 import numpy as np
 
+from castep_parse.utils import find_files_in_dir
+
 __all__ = [
     'read_castep_file',
     'read_geom_file',
     'read_cell_file',
+    'read_output_files',
 ]
 
 
@@ -1095,3 +1098,86 @@ def read_cell_file(cell_path, ret_frac=False):
     }
 
     return cell_dat
+
+
+def read_output_files(dir_path, seedname=None, ignore_missing_output=False):
+    """Parse all output files from a CASTEP simulation.
+
+    Parameters
+    ----------
+    dir_path : str or Path
+        Path to the directory in which a CASTEP simulation has run.
+    seedname : str, optional
+        The CASTEP seedname of the simulation.
+    ignore_missing_outputs : bool, optional
+        If True, outputs in addition to the standard .castep file, such as the
+        .geom file from a geometry optimisation simulation, that are missing
+        from `dir_path` will not result in an error. If False, missing outputs
+        will raise an error. By default, set to False.
+
+    Returns
+    -------
+    outputs : dict
+
+    Notes
+    -----
+    The main output file is`seedname`.castep.
+
+    If `seedname` is specified, raise IOError if there is no `seedname`.castep
+    file in `dir_path`.
+
+    If `seedname` is not specified, raise IOError if there is not exactly one
+    .castep file in `dir_path.
+
+    Depending on the calculation task, additional output files are generated
+    (e.g. `seedname`.geom for geometry optimisations). If these files are not
+    found in `dir_path`, raise an IOError, unless `ignore_missing_output` is
+    True.
+
+    CASTEP versions tested: 17.2
+
+    CASTEP tasks tested: SinglePoint, GeometryOptimisation
+
+    """
+
+    # Find the files ending in .castep in `dir_path`:
+    all_cst_files = find_files_in_dir(dir_path, r'.castep$', recursive=False)
+
+    # If no .castep files in `dir_path, raise IOError.
+    if not all_cst_files:
+        msg = 'No .castep files found in directory {}'.format(dir_path)
+        raise FileNotFoundError(msg)
+
+    if seedname is None:
+        if len(all_cst_files) > 1:
+            msg = 'Seedname not specified, but multiple .castep files found.'
+            raise IOError(msg)
+        else:
+            seedname = all_cst_files[0].split('.castep')[0]
+
+    cst_fn = '{}.castep'.format(seedname)
+    dir_path = Path(dir_path)
+    cst_path = dir_path.joinpath(cst_fn)
+
+    if not cst_path.is_file():
+        msg = 'File not found: {} in directory {}'.format(cst_fn, dir_path)
+        raise FileNotFoundError(msg)
+
+    # Parse the .castep file:
+    cst_dat = read_castep_file(cst_path)
+
+    # Parse additional output files and merge with output from .castep file:
+    is_geom = cst_dat['params']['calc_type'] == 'geometry optimization'
+    if is_geom or (cst_dat['version'] in ['17.2'] and cst_dat['write_geom']):
+
+        # Parse the .geom file:
+        geom_fn = '{}.geom'.format(seedname)
+        geom_path = dir_path.joinpath(geom_fn)
+
+        if not ignore_missing_output and not geom_path.is_file():
+            msg = 'File not found: {} in directory {}'
+            raise FileNotFoundError(msg.format(geom_fn, dir_path))
+
+        cst_dat['geom'] = read_geom_file(geom_path)
+
+    return cst_dat
