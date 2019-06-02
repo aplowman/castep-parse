@@ -32,6 +32,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy',
+        'mendeleev',
     ],
     project_urls={
         'Github': 'https://github.com/aplowman/castep-parse',
