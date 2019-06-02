@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/castep-parse.svg)](https://badge.fury.io/py/castep-parse)
+
 # castep-parse
 Input file writers and output file readers for the density functional theory code CASTEP.
 
