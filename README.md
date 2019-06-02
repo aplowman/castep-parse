@@ -7,23 +7,26 @@ Input file writers and output file readers for the density functional theory cod
 
 ## Notes
 
-This is a work-in-progress.
+This code has generally been used for `task=singlepoint` and `task=geometryoptimisation` simulations. Consequently, input and output files associated with other simulation types are not yet supported.
 
 ## Roadmap
 
 ### Readers:
 
-- ✅
-- ️❌
+- ✅ `read_castep_file`
+- ️✅ `read_geom_file`
+- ✅ `read_cell_file`
+- ✅ `read_output_files`
 
 ### Writers:
 
-- ❌
+- ✅ `write_cell_file`
+- ✅ `write_inputs_files`
 
 ### Utilities:
 
-- ✅
-
+- ✅ `map_species_to_castep`
+- ✅ `get_castep_cell_constraints`
 
 ## Examples
 
