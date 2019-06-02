@@ -249,11 +249,10 @@ def read_castep_file(cst_path, ignore_version=False):
     mode = 'scan'
     prev_mode = mode
 
-    with open(cst_path, 'r') as cst:
+    cst_path = Path(cst_path)
+    with cst_path.open() as handle:
 
-        for ln_idx, ln in enumerate(cst):
-
-            # print('ln_idx: {}'.format(ln_idx))
+        for ln_idx, ln in enumerate(handle):
 
             ln_s = ln.strip().split()
 
