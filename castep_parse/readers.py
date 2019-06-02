@@ -8,11 +8,12 @@ import numpy as np
 __all__ = [
     'read_castep_file',
     'read_geom_file',
+    'read_cell_file',
 ]
 
 
 def read_castep_file(cst_path, ignore_version=False):
-    """Parse a .castep file.
+    """Parse a .castep file from a CASTEP simulation.
 
     Parameters
     ----------
@@ -992,3 +993,105 @@ def read_geom_file(geom_path):
     }
 
     return geom_dat
+
+
+def read_cell_file(cell_path, ret_frac=False):
+    """Parse a CASTEP .cell file to get the atom positions, species and
+    supercell.
+
+    Parameters
+    ----------
+    cell_path : str
+        File name of cell file.
+    ret_frac : bool, optional
+        If True, atoms are returned in fractional coordinates.
+
+    Returns
+    -------
+    cell_dat : dict of (str : ndarray)
+        supercell : ndarray of float of shape (3, 3)
+            Supercell column vectors.
+        atoms : ndarray of float of shape (3, N)
+            Atom coordinates in either a Cartesian or fractional basis.
+        species : ndarray of str of shape (M,)
+            String array of the unique chemical symbols of the atoms.
+        species_idx : ndarray of int of shape (N,)
+            Array which maps each atom site to a chemical symbol in `species`.
+
+    """
+
+    atoms = []
+    atom_sp = []
+    atom_sp_idx = []
+    supercell = np.empty((3, 3))
+    sup_idx = 0
+
+    cell_path = Path(cell_path)
+    with cell_path.open() as handle:
+
+        parse_atoms_frac = False
+        parse_atoms_abs = False
+        parse_supercell = False
+        is_frac = True
+
+        for ln in handle:
+
+            ln = ln.strip()
+
+            if parse_atoms_frac or parse_atoms_abs:
+
+                if ln.upper() in [r'%ENDBLOCK POSITIONS_FRAC',
+                                  r'%ENDBLOCK POSITIONS_ABS']:
+                    parse_atoms_frac = False
+                    parse_atoms_abs = False
+                    continue
+
+                ln_s = ln.split()
+                ats = [float(i) for i in ln_s[1:]]
+                atoms.append(ats)
+
+                if ln_s[0] not in atom_sp:
+                    atom_sp.append(ln_s[0])
+
+                atom_sp_idx.append(atom_sp.index(ln_s[0]))
+
+            elif parse_supercell:
+
+                if ln.upper() == r'%ENDBLOCK LATTICE_CART':
+                    parse_supercell = False
+                    continue
+
+                ln_s = ln.split()
+                try:
+                    sp = [float(i) for i in ln_s]
+                except ValueError:
+                    continue
+
+                supercell[:, sup_idx] = sp
+                sup_idx += 1
+
+            elif ln.upper() == r'%BLOCK POSITIONS_FRAC':
+                parse_atoms_frac = True
+
+            elif ln.upper() == r'%BLOCK POSITIONS_ABS':
+                parse_atoms_abs = True
+                is_frac = False
+
+            elif ln.upper() == r'%BLOCK LATTICE_CART':
+                parse_supercell = True
+
+    atoms = np.array(atoms).T
+
+    if is_frac and not ret_frac:
+        atoms = np.dot(supercell, atoms)
+    elif not is_frac and ret_frac:
+        atoms = np.dot(np.linalg.inv(supercell), atoms)
+
+    cell_dat = {
+        'atom_sites': atoms,
+        'supercell': supercell,
+        'species': np.array(atom_sp),
+        'species_idx': np.array(atom_sp_idx),
+    }
+
+    return cell_dat
