@@ -21,7 +21,7 @@ This code has generally been used for `task=singlepoint` and `task=geometryoptim
 ### Writers:
 
 - ✅ `write_cell_file`
-- ✅ `write_inputs_files`
+- ✅ `write_input_files`
 
 ### Utilities:
 
