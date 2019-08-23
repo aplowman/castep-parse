@@ -484,12 +484,11 @@ def read_castep_file(cst_path, ignore_version=False):
             elif mode == 'scan':
 
                 if CALC_TYPE in ln:
-                    msg = ('Calculation type changed: was "{}", changed to: '
-                           '"{}"').format(calc_type_str, cur_calc_type_str)
+                    msg = 'Calculation type changed: was "{}", changed to: "{}"'
                     cur_calc_type_str = ln.split(':')[1].strip()
                     if calc_type_str is not None:
                         if cur_calc_type_str != calc_type_str:
-                            raise ValueError(msg)
+                            raise ValueError(msg.format(calc_type_str, cur_calc_type_str))
                     calc_type_str = cur_calc_type_str
 
                 elif opt_strategy_match in ln:
