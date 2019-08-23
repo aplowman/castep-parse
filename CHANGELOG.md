@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.1.3] - 2019.08.24
+
+## Changed
+
+- `read_castep_file`, `read_geom_file` and `read_cell_file` now accept any of a file handle, string or Path object.
+
+## Fixed
+
+- Fix bug with `write_input_files` when `param` argument is missing.
+
 ## [0.1.2] - 2019.06.02
 
 ### Fixed
