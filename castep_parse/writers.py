@@ -330,7 +330,18 @@ def write_input_files(supercell, atom_sites, species, species_idx, dir_path,
     if not dir_path.is_dir():
         dir_path.mkdir()
 
-    task = param['task'].upper()
+    input_file_paths = []
+    task = 'SINGLEPOINT'
+
+    # Write param file:
+    if param is not None:
+        task = param.get('task', task).upper()
+        param_path = dir_path.joinpath(seedname + '.param')
+        input_file_paths.append(param_path)
+        with param_path.open('w') as handle:
+            for k, v in sorted(param.items()):
+                handle.write('{:25s}= {}\n'.format(k, v))
+
     geom_opt_str = ['GEOMETRYOPTIMISATION', 'GEOMETRYOPTIMIZATION']
     is_geom_opt = task in geom_opt_str
 
@@ -340,14 +351,6 @@ def write_input_files(supercell, atom_sites, species, species_idx, dir_path,
                                 cell_constraints, atom_constraints,
                                 is_geom_opt)
 
-    input_file_paths = [cell_path]
-
-    # Write param file:
-    if param is not None:
-        param_path = dir_path.joinpath(seedname + '.param')
-        input_file_paths.append(param_path)
-        with param_path.open('w') as handle:
-            for k, v in sorted(param.items()):
-                handle.write('{:25s}= {}\n'.format(k, v))
+    input_file_paths.append(cell_path)
 
     return input_file_paths
