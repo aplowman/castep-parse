@@ -380,6 +380,10 @@ def open_any(path_or_file, as_bytes=False):
         handle = path_or_file.open(mode)
         file_to_close = handle
 
+    elif isinstance(path_or_file, bytes):
+        handle = path_or_file.decode('utf-8').split('\n')
+        file_to_close = None
+
     else:
         handle = path_or_file
         file_to_close = None
