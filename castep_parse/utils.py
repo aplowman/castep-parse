@@ -2,6 +2,8 @@
 
 import re
 import os
+import contextlib
+from pathlib import Path
 
 import mendeleev
 import numpy as np
@@ -367,3 +369,32 @@ def get_castep_cell_constraints(lengths_equal, angles_equal, fix_lengths,
             encoded[1][idx] += 3
 
     return encoded
+
+
+@contextlib.contextmanager
+def open_any(path_or_file, as_bytes=False):
+
+    if isinstance(path_or_file, (str, Path)):
+        path_or_file = Path(path_or_file)
+        mode = 'rb' if as_bytes else 'r'
+        handle = path_or_file.open(mode)
+        file_to_close = handle
+
+    else:
+        handle = path_or_file
+        file_to_close = None
+
+    try:
+        yield handle
+
+    finally:
+        if file_to_close:
+            file_to_close.close()
+
+
+def flexible_open(func):
+    'Decorator for functions that may take a path or file handle.'
+    def decorated(path_or_file, *args, **kwargs):
+        with open_any(path_or_file) as handle:
+            return func(handle, *args, **kwargs)
+    return decorated
