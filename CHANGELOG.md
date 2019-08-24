@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.4] - 2019.08.24
+
+## Changed
+
+- `read_castep_file`, `read_geom_file` and `read_cell_file` now additionally accept input as bytes.
+
 ## [0.1.3] - 2019.08.24
 
 ## Changed
