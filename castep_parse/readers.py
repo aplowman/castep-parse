@@ -12,11 +12,12 @@ __all__ = [
     'read_geom_file',
     'read_cell_file',
     'read_output_files',
+    'read_relaxation',
 ]
 
 
 @flexible_open
-def read_castep_file(path_or_file, ignore_version=False):
+def read_castep_file(path_or_file, ignore_version=False, group_scf_data=False):
     """Parse a .castep file from a CASTEP simulation.
 
     Parameters
@@ -27,6 +28,9 @@ def read_castep_file(path_or_file, ignore_version=False):
         If False, an exception will be raised if the version of CASTEP used to
         generate the .castep file is not in the listed versions that this
         function has been tested with. If True, only a warning is produced.
+    group_scf_data : bool, optional
+        If True, data that is associated with a single SCF cycle is grouped by geometry
+        optimisation step.
 
     Returns
     -------
@@ -179,11 +183,15 @@ def read_castep_file(path_or_file, ignore_version=False):
     # Each BFGS iteration is associated with one or more SCF cycles:
     # Here, scf_cycle refers to a whole SCF convergence process to find the
     # groundstate wavefunction
+    scf_geom_idx_current = 0
+    scf_geom_idx = []
     scf_cycle_idx = 0
+
     # Index list where indices correspond to 0: 'initial, 1: 'trial guess',
     # 2: 'line', 3: 'quad'
-    scf_cycle_type_idx = []
-    bfgs_lambda = []
+    scf_cycle_type_idx = [0]      # Always an initial SCF cycle
+    bfgs_lambda = [np.nan]        # Always an initial SCF cycle
+
     cell_contents = []
     current_cell_conts = []
 
@@ -413,8 +421,8 @@ def read_castep_file(path_or_file, ignore_version=False):
                 mode = 'scan'
                 scf_iter_idx = -SCF_HEADER_LNS
                 scf_cycle_idx += 1
+                scf_geom_idx.append(scf_geom_idx_current)
                 all_scf_data.append(np.array(scf_cycle_data))
-
                 scf_cycle_data = []
 
             elif scf_iter_idx >= 0:
@@ -606,6 +614,7 @@ def read_castep_file(path_or_file, ignore_version=False):
                 mode = 'parse_con_sym_forces'
 
             elif BFGS_END in ln:
+                scf_geom_idx_current += 1
                 bfgs_enthalpy.append(float(ln_s[-2]))
 
             elif BFGS_START in ln or BFGS_IMPROVE in ln:
@@ -659,6 +668,7 @@ def read_castep_file(path_or_file, ignore_version=False):
 
     # Change to numpy arrays where sensible:
     scf_cycle_type = BFGS_CYCLE_TYPE_STR[scf_cycle_type_idx]
+    scf_cycle_type_idx = np.array(scf_cycle_type_idx)
     bfgs_lambda = np.array(bfgs_lambda)
     final_energy = np.array(final_energy)
     final_fenergy = np.array(final_fenergy)
@@ -678,11 +688,23 @@ def read_castep_file(path_or_file, ignore_version=False):
     cell_contents = np.array(cell_contents)
     species = np.array(species)
     species_idx = np.array(species_idx)
+    scf_geom_idx = np.array(scf_geom_idx)
 
     # Constrained forces are repeated at the end of BFGS output in Final
     # config, so remove the last entry if geometry optimisation:
     if calc_type_str == 'geometry optimization':
         all_constrained_forces = all_constrained_forces[:-1]
+
+    bfgs_num_iters = bfgs_iter_idx + 1
+    scf_geom_map = [np.where(scf_geom_idx == i)[0] for i in range(bfgs_num_iters)]
+    if group_scf_data:
+        final_energy = [final_energy[i] for i in scf_geom_map]
+        final_fenergy = [final_fenergy[i] for i in scf_geom_map]
+        final_zenergy = [final_zenergy[i] for i in scf_geom_map]
+        scf_cycle_type_idx = [scf_cycle_type_idx[i] for i in scf_geom_map]
+        scf_cycle_type = [scf_cycle_type[i] for i in scf_geom_map]
+        bfgs_lambda = [bfgs_lambda[i] for i in scf_geom_map]
+        all_constrained_forces = [all_constrained_forces[i] for i in scf_geom_map]
 
     tot_time_hrs = tot_time / 3600
 
@@ -734,7 +756,7 @@ def read_castep_file(path_or_file, ignore_version=False):
         'cell_volume':              cell_volume,
         'bfgs_lambda':              bfgs_lambda,
         'bfgs_enthalpy':            bfgs_enthalpy,
-        'bfgs_num_iters':           bfgs_iter_idx + 1,
+        'bfgs_num_iters':           bfgs_num_iters,
         'bfgs_dE_per_ion':          dE_per_ion,
         'bfgs_mag_F_max':           mag_F_max,
         'bfgs_mag_dR_max':          mag_dR_max,
@@ -753,6 +775,8 @@ def read_castep_file(path_or_file, ignore_version=False):
         'species_idx':              species_idx,
         'errors':                   errors,
         'warnings':                 warnings,
+        'scf_geom_idx':             scf_geom_idx,
+        'scf_geom_map':             scf_geom_map,
     }
 
     return castep_dat
@@ -1170,3 +1194,40 @@ def read_output_files(dir_path, seedname=None, ignore_missing_output=False):
         cst_dat['geom'] = read_geom_file(geom_path)
 
     return cst_dat
+
+
+def read_relaxation(castep_path_or_file, geom_path_or_file, data=None):
+    """Read CASTEP outputs into a dict format that can be used in the constructor of the
+    `AtomisticRelaxation` class of the `atomistic` package.
+
+    Parameters
+    ----------
+    data : list of str
+        List of keys in the output dict from `read_castep_file` to include in the
+        returned "data" sub-dict.
+
+    """
+
+    if not data:
+        data = ['final_energy', 'final_fenergy', 'final_zenergy']
+
+    cst_dat = read_castep_file(castep_path_or_file)
+    geom_dat = read_geom_file(geom_path_or_file)
+
+    # TODO: validate `data`.
+
+    # TODO: length of final_energy does not match geom_dat stuff?
+
+    out = {
+        'initial_structure': {
+            'atoms': geom_dat['ions'][0],
+            'supercell': geom_dat['cells'][0],
+            'species': geom_dat['species'][geom_dat['species_idx']],
+        },
+        'atom_displacements': geom_dat['ions'] - geom_dat['ions'][0],
+        'supercell_displacements': geom_dat['cells'] - geom_dat['cells'][0],
+        'data': {
+            i: cst_dat[i] for i in data
+        },
+    }
+    return out
