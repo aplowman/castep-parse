@@ -669,8 +669,7 @@ def read_castep_file(path_or_file, ignore_version=False):
     s_max = np.array(s_max)
     all_constrained_forces = np.array(all_constrained_forces)
     all_unconstrained_forces = np.array(all_unconstrained_forces)
-    all_constrained_symmetrised_forces = np.array(
-        all_constrained_symmetrised_forces)
+    all_constrained_symmetrised_forces = np.array(all_constrained_symmetrised_forces)
     real_lattice = np.array(real_lattice)
     recip_lattice = np.array(recip_lattice)
     lattice_params = np.array(lattice_params)
