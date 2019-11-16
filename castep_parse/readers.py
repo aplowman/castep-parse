@@ -1208,15 +1208,13 @@ def read_relaxation(castep_path_or_file, geom_path_or_file, data=None):
 
     """
 
+    raise NotImplementedError()
+
     if not data:
         data = ['final_energy', 'final_fenergy', 'final_zenergy']
 
-    cst_dat = read_castep_file(castep_path_or_file)
+    cst_dat = read_castep_file(castep_path_or_file, group_scf_data=True)
     geom_dat = read_geom_file(geom_path_or_file)
-
-    # TODO: validate `data`.
-
-    # TODO: length of final_energy does not match geom_dat stuff?
 
     out = {
         'initial_structure': {
