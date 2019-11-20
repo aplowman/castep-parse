@@ -72,6 +72,7 @@ def read_castep_file(file_path):
 
             run_geom_iters = run['geom'].pop('iterations')
 
+            # Extract out SCF cycles and energies from geom iteration steps:
             for geom_iter in run_geom_iters:
 
                 for step in geom_iter['steps']:
@@ -98,12 +99,21 @@ def read_castep_file(file_path):
 
     out = {
         'runs': runs,
-        'total_time_s': total_time,
         'SCF': scf_all,
+        'total_time_s': total_time,
     }
 
-    if 'geom' in runs_list[0]:
-        out.update({'geom': geom_iters})
+    if 'geom' in runs[0]:
+        is_converged = bool(runs[-1]['geom']['final'])
+        out.update({
+            'geom': {
+                'iterations': geom_iters,
+                'is_converged': is_converged,
+            }
+        })
+
+        if not is_converged:
+            warn('Geometry not converged.')
 
     return out
 
@@ -661,7 +671,6 @@ def parse_castep_run(run_str, run_idx):
         for geom_idx, geom_iter_str in enumerate(geom_iters_str_list, 1):
 
             if 'BFGS: finished iteration' not in geom_iter_str:
-                warn('Geometry iteration {} of run {} did not finish.'.format(geom_idx, run_idx))
                 continue
             geom_iters.append(parse_castep_file_geom_iter(geom_iter_str, parameters))
 
@@ -1190,7 +1199,6 @@ def parse_castep_file_final_info(final_str):
     out = {
         'forces': forces,
         'statistics': stats,
-        # 'remainder_str': remainder_str,
     }
 
     return out
