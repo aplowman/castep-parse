@@ -13,6 +13,7 @@ __all__ = [
     'read_geom_file',
     'read_cell_file',
     'read_output_files',
+    'merge_geom_data',
     'read_relaxation',
 ]
 
@@ -73,22 +74,23 @@ def read_castep_file(file_path):
             run_geom_iters = run['geom'].pop('iterations')
 
             # Extract out SCF cycles and energies from geom iteration steps:
-            for geom_iter in run_geom_iters:
+            for geom_iter in run_geom_iters[1:]:
 
                 for step in geom_iter['steps']:
 
-                    scf = step.pop('scf')
-                    scf_energies = step.pop('scf_energies')
+                    if 'scf' in step:
+                        scf = step.pop('scf')
+                        scf_energies = step.pop('scf_energies')
 
-                    scf_all['cycles'].append(scf)
+                        scf_all['cycles'].append(scf)
 
-                    for en_name, en in scf_energies.items():
-                        if not scf_all['energies'].get(en_name):
-                            scf_all['energies'][en_name] = []
-                        scf_all['energies'][en_name].append(en)
+                        for en_name, en in scf_energies.items():
+                            if not scf_all['energies'].get(en_name):
+                                scf_all['energies'][en_name] = []
+                            scf_all['energies'][en_name].append(en)
 
-                    step['SCF_idx'] = scf_idx
-                    scf_idx += 1
+                        step['SCF_idx'] = scf_idx
+                        scf_idx += 1
 
             geom_iters.extend(run_geom_iters)
 
@@ -224,6 +226,7 @@ def read_geom_file(path_or_file):
     iter_num_line = False
     species = []
     species_idx = []
+    iter_nums = []
 
     force_ln_idx = 0
 
@@ -245,6 +248,8 @@ def read_geom_file(path_or_file):
                 pass
 
         if (ITER_NUM in ln) or iter_num_line:
+
+            iter_nums.append(int(ln_s[0]))
 
             iter_num_line = False
 
@@ -341,9 +346,10 @@ def read_geom_file(path_or_file):
         'cell_stresses':    all_stresses,
         'species_idx':      species_idx,
         'species':          species,
-        'ions':             ions,
+        'atoms':            ions,
         'forces':           forces,
         'bfgs_num_iter':    len(energies),
+        'iter_num':         iter_nums,
     }
 
     return geom_dat
@@ -449,6 +455,31 @@ def read_cell_file(path_or_file, ret_frac=False):
     return cell_dat
 
 
+def merge_geom_data(castep_dat, geom_dat):
+    'Merge data from a .geom file into data from a .castep file.'
+
+    iter_num_offset = 0
+    for idx, iter_num in enumerate(geom_dat['iter_num']):
+
+        if iter_num == 1 and idx > 1:
+            iter_num_offset += geom_dat['iter_num'][idx - 1]
+
+        castep_dat['geom']['iterations'][iter_num + iter_num_offset].update({
+            'cell':         geom_dat['cells'][idx],
+            'energy':       geom_dat['energies'][idx],
+            'free_energy':  geom_dat['free_energies'][idx],
+            'atoms':        geom_dat['atoms'][idx],
+            'forces':       geom_dat['forces'][idx],
+        })
+
+        if geom_dat['cell_stresses'].size:
+            castep_dat['geom']['iterations'][iter_num].update({
+                'cell_stress':  geom_dat['cell_stresses'][idx],
+            })
+
+    return castep_dat
+
+
 def read_output_files(dir_path, seedname=None, ignore_missing_output=False):
     """Parse all output files from a CASTEP simulation.
 
@@ -515,9 +546,10 @@ def read_output_files(dir_path, seedname=None, ignore_missing_output=False):
     # Parse the .castep file:
     cst_dat = read_castep_file(cst_path)
 
-    # Parse additional output files and merge with output from .castep file:
-    is_geom = cst_dat['params']['calc_type'] == 'geometry optimization'
-    if is_geom or (cst_dat['version'] in ['17.2'] and cst_dat['write_geom']):
+    calc_type = cst_dat['runs'][0]['parameters']['general_parameters']['type_of_calculation']
+    is_geom = calc_type == 'geometry optimization'
+    if is_geom:
+        # TODO: check if need `write_geom` parameter from old version?
 
         # Parse the .geom file:
         geom_fn = '{}.geom'.format(seedname)
@@ -527,7 +559,9 @@ def read_output_files(dir_path, seedname=None, ignore_missing_output=False):
             msg = 'File not found: {} in directory {}'
             raise FileNotFoundError(msg.format(geom_fn, dir_path))
 
-        cst_dat['geom'] = read_geom_file(geom_path)
+        geom_dat = read_geom_file(geom_path)
+
+        cst_dat = merge_geom_data(cst_dat, geom_dat)
 
     return cst_dat
 
@@ -625,7 +659,7 @@ def parse_castep_run(run_str, run_idx):
         geom_initial = {
             'resources': parse_castep_file_resource_estimates(geom_initial_str),
             'forces': parse_castep_file_forces(geom_initial_str),
-            'geom_initial_iter': parse_castep_file_geom_iter_info(geom_initial_str),
+            **parse_castep_file_geom_iter_info(geom_initial_str),
         }
 
         geom_final = {}
@@ -667,7 +701,23 @@ def parse_castep_run(run_str, run_idx):
             })
 
         # Parse each geom iteration:
+        geom_iter_initial = {k: v for k, v in geom_initial.items()
+                             if k not in ['forces', 'resources']}
+
         geom_iters = []
+        if run_idx == 0:
+            # Only add the zeroth geom iteration if the first run of the file.
+            geom_iters.append(
+                {
+                    **geom_iter_initial,
+                    'steps': [
+                        {
+                            'forces': geom_initial['forces'],
+                        }
+                    ]
+                }
+            )
+
         for geom_idx, geom_iter_str in enumerate(geom_iters_str_list, 1):
 
             if 'BFGS: finished iteration' not in geom_iter_str:
