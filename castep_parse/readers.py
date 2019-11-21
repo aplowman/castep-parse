@@ -80,12 +80,15 @@ def read_castep_file(path_or_file):
 
             run_geom_iters = run['geom'].pop('iterations')
 
-            # Extract out SCF cycles and energies from geom iteration steps:
-            for geom_iter in run_geom_iters[1:]:
+            # Extract out SCF cycles and energies from geom iteration steps
+            for geom_idx, geom_iter in enumerate(run_geom_iters):
 
                 for step in geom_iter['steps']:
 
-                    if 'scf' in step:
+                    if run_idx == 0 and geom_idx == 0:
+                        step['SCF_idx'] = run['SCF_idx'][-1]
+
+                    else:
                         scf = step.pop('scf')
                         scf_energies = step.pop('scf_energies')
 
@@ -484,6 +487,8 @@ def merge_geom_data(castep_dat, geom_dat):
                 'cell_stress':  geom_dat['cell_stresses'][idx],
             })
 
+        castep_dat['geom']['species'] = geom_dat['species'][geom_dat['species_idx']]
+
     return castep_dat
 
 
@@ -573,37 +578,53 @@ def read_output_files(dir_path, seedname=None, ignore_missing_output=False):
     return cst_dat
 
 
-def read_relaxation(castep_path_or_file, geom_path_or_file, data=None):
+def read_relaxation(castep_path_or_file, geom_path_or_file):
     """Read CASTEP outputs into a dict format that can be used in the constructor of the
     `AtomisticRelaxation` class of the `atomistic` package.
 
-    Parameters
-    ----------
-    data : list of str
-        List of keys in the output dict from `read_castep_file` to include in the
-        returned "data" sub-dict.
-
     """
 
-    raise NotImplementedError()
-
-    if not data:
-        data = ['final_energy', 'final_fenergy', 'final_zenergy']
-
-    cst_dat = read_castep_file(castep_path_or_file, group_scf_data=True)
+    cst_dat = read_castep_file(castep_path_or_file)
     geom_dat = read_geom_file(geom_path_or_file)
+    merged_dat = merge_geom_data(cst_dat, geom_dat)
+
+    data = {}
+    atoms = []
+    supercell = []
+
+    for geom_iter in merged_dat['geom']['iterations']:
+
+        final_step = geom_iter['steps'][-1]
+        scf_idx = final_step['SCF_idx']
+        for en_name, en in merged_dat['SCF']['energies'].items():
+            if en_name not in data:
+                data[en_name] = [en[scf_idx]]
+            else:
+                data[en_name].append(en[scf_idx])
+
+        if geom_iter.get('atoms') is not None:
+            atoms.append(geom_iter['atoms'])
+            supercell.append(geom_iter['cell'])
+        else:
+            # Iteration is missing from the .geom file (due to structure reversion)
+            atoms.append(atoms[-1])
+            supercell.append(supercell[-1])
+
+    for en_name in data:
+        data[en_name] = np.array(data[en_name])
+
+    atoms = np.array(atoms)
+    supercell = np.array(supercell)
 
     out = {
         'initial_structure': {
-            'atoms': geom_dat['ions'][0],
-            'supercell': geom_dat['cells'][0],
-            'species': geom_dat['species'][geom_dat['species_idx']],
+            'atoms': atoms[0],
+            'supercell': supercell[0],
+            'species': merged_dat['geom']['species'],
         },
-        'atom_displacements': geom_dat['ions'] - geom_dat['ions'][0],
-        'supercell_displacements': geom_dat['cells'] - geom_dat['cells'][0],
-        'data': {
-            i: cst_dat[i] for i in data
-        },
+        'atom_displacements': atoms - atoms[0],
+        'supercell_displacements': supercell - supercell[0],
+        'data': data,
     }
     return out
 
@@ -674,7 +695,6 @@ def parse_castep_run(run_str, run_idx):
             # The geometry optimisation is finished in this run
 
             print('Geometry optimisation finished in run {}'.format(run_idx))
-            # TODO consider case where max geom iters is reached.
 
             final_iter_str, end_str = re.split(pat_finished_geom, geom_iters_str_list[-1])
             geom_iters_str_list[-1] = final_iter_str
