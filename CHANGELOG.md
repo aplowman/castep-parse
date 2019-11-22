@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.2.0] - 2019.11.22
+
+## Changed
+
+- `read_castep_file` is now more logical and testable (but less-performant). Instead of iterating over lines in the .castep file, it splits it into sections and parsing individual blocks. This means it handles much better the situation a CASTEP run has been continued and the output is appended to the same .castep file as the original run.
+- Use of `flexible_open` decorator is now more limited but better defined. In particular, the functions `read_castep_file`, `read_geom_file` and `read_cell_file` accept as their "file" input argument one of these types: `str`, `pathlib.Path`, `bytes` or `TextIOWrapper`. If a string or `Path` object, it is assumed to be the file path.
+
+## Added
+
+- `read_relaxation` function
+- `merge_geom_data` function to merge data from .geom file with that from .castep file.
+
 ## [0.1.4] - 2019.08.24
 
 ## Changed
