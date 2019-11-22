@@ -1,10 +1,15 @@
 """`castep_parse.test.test_readers.py`"""
 
+import os
 import unittest
+from pathlib import Path
 
 import numpy as np
 
 from castep_parse.readers import (
+    read_castep_file,
+    read_cell_file,
+    read_geom_file,
     parse_castep_file_header,
     parse_castep_file_parameters,
     parse_castep_file_geom_iter_info,
@@ -19,6 +24,79 @@ from castep_parse.readers import (
     parse_castep_file_run_stats,
     parse_castep_file_kpoint_info,
 )
+from castep_parse.utils import array_nan_equal
+
+ROOT_FILES_PATH = os.path.join('tests', 'castep_files')
+
+
+class FlexibleOpenTestCase(unittest.TestCase):
+    'Test different inputs are equivalent in read_* functions due to `flexible_open`.'
+
+    def test_flexible_read_cell(self):
+
+        cell_filename = os.path.join(ROOT_FILES_PATH, 'GO_cell.cell')
+
+        cell_out_1 = read_cell_file(cell_filename)
+        cell_path = Path(cell_filename)
+        cell_out_2 = read_cell_file(cell_path)
+
+        with cell_path.open() as handle:
+            cell_out_3 = read_cell_file(handle)
+
+        with cell_path.open('rb') as handle:
+            cell_bytes = handle.read()
+            cell_out_4 = read_cell_file(cell_bytes)
+
+        for k in ['atom_sites', 'supercell', 'species', 'species_idx']:
+            self.assertTrue(
+                np.array_equal(cell_out_1[k], cell_out_2[k]) and
+                np.array_equal(cell_out_2[k], cell_out_3[k]) and
+                np.array_equal(cell_out_3[k], cell_out_4[k])
+            )
+
+    def test_flexible_read_castep(self):
+
+        cst_filename = os.path.join(ROOT_FILES_PATH, 'GO_cell.castep')
+
+        cst_out_1 = read_castep_file(cst_filename)
+
+        cst_path = Path(cst_filename)
+        cst_out_2 = read_castep_file(cst_path)
+
+        with cst_path.open() as handle:
+            cst_out_3 = read_castep_file(handle)
+
+        with cst_path.open('rb') as handle:
+            cst_bytes = handle.read()
+            cst_out_4 = read_castep_file(cst_bytes)
+
+        self.assertTrue(
+            array_nan_equal(cst_out_1['SCF']['cycles'][0], cst_out_2['SCF']['cycles'][0]) and
+            array_nan_equal(cst_out_2['SCF']['cycles'][0], cst_out_3['SCF']['cycles'][0]) and
+            array_nan_equal(cst_out_3['SCF']['cycles'][0], cst_out_4['SCF']['cycles'][0])
+        )
+
+    def test_flexible_read_geom(self):
+
+        geom_filename = os.path.join(ROOT_FILES_PATH, 'GO_cell.geom')
+
+        geom_out_1 = read_geom_file(geom_filename)
+        geom_path = Path(geom_filename)
+        geom_out_2 = read_geom_file(geom_path)
+
+        with geom_path.open() as handle:
+            geom_out_3 = read_geom_file(handle)
+
+        with geom_path.open('rb') as handle:
+            geom_bytes = handle.read()
+            geom_out_4 = read_geom_file(geom_bytes)
+
+        for k in ['energies', 'forces']:
+            self.assertTrue(
+                np.array_equal(geom_out_1[k], geom_out_2[k]) and
+                np.array_equal(geom_out_2[k], geom_out_3[k]) and
+                np.array_equal(geom_out_3[k], geom_out_4[k])
+            )
 
 
 class CastepFileParsersTestCase(unittest.TestCase):
