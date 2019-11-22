@@ -2,7 +2,7 @@
 
 import re
 import os
-import contextlib
+from io import TextIOWrapper
 from pathlib import Path
 
 import mendeleev
@@ -371,34 +371,34 @@ def get_castep_cell_constraints(lengths_equal, angles_equal, fix_lengths,
     return encoded
 
 
-@contextlib.contextmanager
-def open_any(path_or_file, as_bytes=False):
-
-    if isinstance(path_or_file, (str, Path)):
-        path_or_file = Path(path_or_file)
-        mode = 'rb' if as_bytes else 'r'
-        handle = path_or_file.open(mode)
-        file_to_close = handle
-
-    elif isinstance(path_or_file, bytes):
-        handle = path_or_file.decode('utf-8').split('\n')
-        file_to_close = None
-
-    else:
-        handle = path_or_file
-        file_to_close = None
-
-    try:
-        yield handle
-
-    finally:
-        if file_to_close:
-            file_to_close.close()
-
-
 def flexible_open(func):
     'Decorator for functions that may take a path or file handle.'
-    def decorated(path_or_file, *args, **kwargs):
-        with open_any(path_or_file) as handle:
-            return func(handle, *args, **kwargs)
+    def decorated(path_or_bytes, *args, **kwargs):
+
+        if isinstance(path_or_bytes, (str, Path)):
+            path_or_bytes = Path(path_or_bytes)
+            with path_or_bytes.open('r') as handle:
+                lines = handle.read().splitlines()
+
+        elif isinstance(path_or_bytes, bytes):
+            lines = path_or_bytes.decode('utf-8').split('\n')
+
+        elif isinstance(path_or_bytes, TextIOWrapper):
+            lines = path_or_bytes.read().splitlines()
+
+        else:
+            raise ValueError
+
+        return func(lines, *args, **kwargs)
+
     return decorated
+
+
+def array_nan_equal(a, b):
+    'Check is two arrays are equal, where some elements may be NaNs.'
+    nonan_a = ~np.isnan(a)
+    nonan_b = ~np.isnan(b)
+    if not np.array_equal(nonan_a, nonan_b):
+        return False
+    else:
+        return np.allclose(a[nonan_a], b[nonan_a])
