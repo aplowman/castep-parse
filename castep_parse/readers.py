@@ -679,16 +679,16 @@ def parse_castep_run(run_str, run_idx):
 
     elif parameters['general_parameters']['type_of_calculation'] == 'geometry optimization':
 
-        is_restart = bool(parameters['general_parameters'].get('continuing_from'))
-
         run_info_split = re.split(
             r'(\+-{16} MEMORY AND SCRATCH DISK ESTIMATES PER PROCESS -{14}\+)', remainder_str)
-        if is_restart:
-            run_info_str = run_info_split[0]
-            remainder_str = run_info_split[1] + run_info_split[2]
-        else:
+
+        initial_SCF = '<-- SCF' in run_info_split[2][:1500]
+        if initial_SCF:
             run_info_str = run_info_split[0] + run_info_split[1] + run_info_split[2]
             remainder_str = run_info_split[3] + run_info_split[4]
+        else:
+            run_info_str = run_info_split[0]
+            remainder_str = run_info_split[1] + run_info_split[2]
 
         # Extract out geom iterations:
         geom_iters_split = re.split(pat_geom_iter_delim, remainder_str)

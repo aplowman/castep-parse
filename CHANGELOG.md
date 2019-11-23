@@ -4,8 +4,9 @@
 
 ## Fixed
 
-- Fix white space issue in parsing forces block in .castep file.
-- Fix parsing bug when geometry <frequency> is unchanged from its initial value
+- Fixed white space issue in parsing forces block in .castep file.
+- Fixed bug in parsing .castep file when geometry <frequency> is unchanged from its initial value.
+- Fixed bug in parsing .castep file when there is an initial SCF cycle on continuation of a geometry optimisation.
 
 ## [0.2.0] - 2019.11.22
 
