@@ -78,7 +78,7 @@ def read_castep_file(path_or_file):
             total_time += t
 
         else:
-            # Add on the last-recorded SCF time:
+            # Add on the last-recorded SCF time (of completed geom iterations):
             t = run['geom']['iterations'][-1]['steps'][-1]['scf'][-1, -1]
             total_time += t
 
@@ -789,7 +789,7 @@ def parse_castep_run(run_str, run_idx):
             'scf_energies': run_info['scf_energies'],
         })
 
-    if end_str:
+    if end_str and ('Total time' in end_str):
         final_info = parse_castep_file_final_info(end_str)
         run.update({'final_info': final_info})
 
