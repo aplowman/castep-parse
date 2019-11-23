@@ -1087,7 +1087,7 @@ def parse_castep_file_forces(forces_str):
         raise ValueError('Cannot parse forces block: \n"{!s}"'.format(forces_str))
 
     # Now split so we get the "body" of the block:
-    pat_forces = r'(?:\* (?:-{45}|-{56}|-{80}) \*)|(?: (?:\*{84}|\*{60}|\*{49}))'
+    pat_forces = r'(?:\* (?:-{45}|-{56}|-{80}) \*)|(?:\s(?:\*{84}|\*{60}|\*{49})[^\*]*)'
     forces_body = re.split(pat_forces, forces_str)[1]
     forces_lines = forces_body.strip().split('\n')[2:-1]
     lns_ss = [i.strip().split() for i in forces_lines]
@@ -1273,7 +1273,7 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
 
 def parse_castep_file_final_info(final_str):
 
-    pat_forces = r'(\*{84}|\*{60}|\*{49})'
+    pat_forces = r'\s((?:\*{84}|\*{60}|\*{49})[^\*])'
     forces_split = re.split(pat_forces, final_str)
 
     forces_str_list = [''.join(forces_split[i:i+2])

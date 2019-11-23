@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.1] - 2019.xx.xx
+
+## Fixed
+
+- Fix white space issue in parsing forces block in .castep file.
+
 ## [0.2.0] - 2019.11.22
 
 ## Changed
