@@ -79,8 +79,12 @@ def read_castep_file(path_or_file):
 
         else:
             # Add on the last-recorded SCF time (of completed geom iterations):
-            t = run['geom']['iterations'][-1]['steps'][-1]['scf'][-1, -1]
-            total_time += t
+            all_iters = run['geom']['iterations']
+            if all_iters:
+                final_step = all_iters[-1]['steps'][-1]
+                if 'scf' in final_step:
+                    t = final_step['scf'][-1, -1]
+                    total_time += t
 
         if 'geom' in run:
 

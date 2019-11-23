@@ -8,6 +8,7 @@
 - Fixed bug in parsing .castep file when geometry <frequency> is unchanged from its initial value.
 - Fixed bug in parsing .castep file when there is an initial SCF cycle on continuation of a geometry optimisation.
 - Only add final info to run `dict` if the final info includes the total time string.
+- Fixed issue when adding up total time if no previous SCF cycle to get last time from.
 
 ## [0.2.0] - 2019.11.22
 
