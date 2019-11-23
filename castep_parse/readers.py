@@ -55,6 +55,10 @@ def read_castep_file(path_or_file):
 
     for run_idx, run_str in enumerate(runs_list):
 
+        if 'Cell Contents' not in run_str:
+            warn('Skipping run {}, looks incomplete.'.format(run_idx))
+            continue
+
         run = parse_castep_run(run_str, run_idx)
 
         # Extract out SCF and SCF energies
