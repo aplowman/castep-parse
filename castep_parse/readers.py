@@ -648,7 +648,7 @@ def parse_castep_run(run_str, run_idx):
     pat_params = r'((?:\s\*{36}\sTitle\s\*{36})|(?:\s\*{79}\n))'
     pat_geom_iter_delim = r'(={80}\n\sStarting [L]?BFGS iteration\s+[0-9]+.+\n={80})'
     pat_finished_geom = r'[L]?BFGS: Geometry optimization completed successfully.'
-    pat_final_geom_end = r'([L]?BFGS: Final (<frequency>|bulk modulus)\s+=\s+.*)'
+    pat_final_geom_end = r'([L]?BFGS: Final (<frequency>|bulk modulus)\s+(?:=|unchanged)\s+.*)'
 
     header_split = re.split(pat_header, run_str)
     header_str = ''.join([header_split[i] for i in [1, 2, 3, 4, 5]])
@@ -719,14 +719,20 @@ def parse_castep_run(run_str, run_idx):
             if freq_or_mod == '<frequency>':
                 final_cell_conts = parse_castep_file_cell_contents(
                     final_geom_str, is_initial=False)
-                final_freq = float(geom_freq_mod_str.strip().split()[-2])
+                try:
+                    final_freq = float(geom_freq_mod_str.strip().split()[-2])
+                except ValueError:
+                    final_freq = None
                 geom_final.update({
                     'cell_contents': final_cell_conts,
                     'final_frequency': final_freq,
                 })
             elif freq_or_mod == 'bulk modulus':
                 final_cell = parse_castep_file_unit_cell(final_geom_str, is_initial=False)
-                final_bulk_mod = float(geom_freq_mod_str.strip().split()[-2])
+                try:
+                    final_bulk_mod = float(geom_freq_mod_str.strip().split()[-2])
+                except ValueError:
+                    final_freq = None
                 geom_final.update({
                     'unit_cell': final_cell,
                     'bulk_modulus': final_bulk_mod,

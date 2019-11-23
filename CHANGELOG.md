@@ -5,6 +5,7 @@
 ## Fixed
 
 - Fix white space issue in parsing forces block in .castep file.
+- Fix parsing bug when geometry <frequency> is unchanged from its initial value
 
 ## [0.2.0] - 2019.11.22
 
