@@ -29,8 +29,8 @@ def read_castep_file(path_or_file):
 
     Notes
     -----
-    The `flexible_open` decorator ensure the `path_or_file` object is converted to a list
-    or strings.
+    The `flexible_open` decorators ensure the `path_or_file` object is converted to a list
+    of strings.
 
     """
 
@@ -163,8 +163,8 @@ def read_geom_file(path_or_file):
 
     Notes
     -----
-    The `flexible_open` decorator ensure the `path_or_file` object is converted to a list
-    or strings.
+    The `flexible_open` decorator ensures the `path_or_file` object is converted to a list
+    of strings.
 
     The .geom file includes the main results at the end of each BFGS step. All quantities
     in the .geom file are expressed in atomic units. Returned data is in eV (energies),
@@ -407,8 +407,8 @@ def read_cell_file(path_or_file, ret_frac=False):
 
     Notes
     -----
-    The `flexible_open` decorator ensure the `path_or_file` object is converted to a list
-    or strings.
+    The `flexible_open` decorator ensures the `path_or_file` object is converted to a list
+    of strings.
 
     """
 
