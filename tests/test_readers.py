@@ -48,6 +48,40 @@ class ReadersTestCase(unittest.TestCase):
         cell_3 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'SP.cell'))
 
 
+class ReadStructureTestCase(unittest.TestCase):
+    'Checking for consistency between cell and geom file readers.'
+
+    def test_initial_structure_consistency(self):
+        'Check cell file structure is equivalent to first structure reported in geom file'
+
+        def check_consistent(cell_dat, geom_dat):
+
+            self.assertTrue(np.allclose(geom_dat['cells'][0], cell_dat['supercell']))
+
+            atm_c = cell_dat['atom_sites']
+            atm_c_srt_idx = np.lexsort(np.round(atm_c, decimals=7))
+            atm_c_srt = atm_c[:, atm_c_srt_idx]
+            species_c = cell_dat['species'][cell_dat['species_idx']]
+            species_c_srt = species_c[atm_c_srt_idx]
+
+            atm_g = geom_dat['atoms'][0]
+            atm_g_srt_idx = np.lexsort(np.round(atm_g, decimals=7))
+            atm_g_srt = atm_g[:, atm_g_srt_idx]
+            species_g = geom_dat['species'][geom_dat['species_idx']]
+            species_g_srt = species_g[atm_g_srt_idx]
+
+            self.assertTrue(np.allclose(atm_c_srt, atm_g_srt))
+            self.assertTrue(np.array_equal(species_c_srt, species_g_srt))
+
+        cell_1 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.cell'))
+        geom_1 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.geom'))
+        check_consistent(cell_1, geom_1)
+
+        cell_2 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.cell'))
+        geom_2 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.geom'))
+        check_consistent(cell_2, geom_2)
+
+
 class FlexibleOpenTestCase(unittest.TestCase):
     'Test different inputs are equivalent in read_* functions due to `flexible_open`.'
 
