@@ -6,7 +6,7 @@ from warnings import warn
 
 import numpy as np
 
-from castep_parse.utils import find_files_in_dir, flexible_open
+from castep_parse.utils import find_files_in_dir, flexible_open, map_species_to_castep
 
 __all__ = [
     'read_castep_file',
@@ -14,6 +14,8 @@ __all__ = [
     'read_cell_file',
     'read_output_files',
     'merge_geom_data',
+    'merge_cell_data',
+    'merge_output_data',
     'read_relaxation',
 ]
 
@@ -509,6 +511,41 @@ def merge_geom_data(castep_dat, geom_dat):
             })
 
         castep_dat['geom']['species'] = geom_dat['species'][geom_dat['species_idx']]
+
+    return castep_dat
+
+
+def merge_cell_data(castep_dat, cell_dat):
+    'Merge data from a .cell file into data from a .castep file.'
+
+    # Reorder .cell atoms into order expected in .geom file or an output .cell file:
+
+    species = cell_dat['species']
+    species_idx_old = cell_dat['species_idx']
+
+    species_map = map_species_to_castep(species, species_idx_old)
+    species_idx = species_idx_old[species_map]
+    species_all = species[species_idx]
+
+    castep_dat.update({
+        'structure': {
+            'atoms': cell_dat['atom_sites'],
+            'supercell': cell_dat['supercell'],
+            'species': species_all,
+        }
+    })
+
+    return castep_dat
+
+
+def merge_output_data(castep_dat, geom_dat=None, cell_dat=None):
+    'Merge .geom and/or .cell data with .castep file data'
+
+    if geom_dat:
+        castep_dat = merge_geom_data(castep_dat, geom_dat)
+
+    if cell_dat:
+        castep_dat = merge_cell_data(castep_dat, cell_dat)
 
     return castep_dat
 

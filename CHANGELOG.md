@@ -2,6 +2,10 @@
 
 ## [0.2.1] - 2019.xx.xx
 
+## Added
+
+- Added function `merge_cell_data` to merge outputs from `read_cell_file` with those from `read_castep_file`.
+
 ## Fixed
 
 - Fixed white space issue in parsing forces block in .castep file.
