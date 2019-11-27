@@ -494,7 +494,7 @@ def merge_geom_data(castep_dat, geom_dat):
     iter_num_offset = 0
     for idx, iter_num in enumerate(geom_dat['iter_num']):
 
-        if iter_num == 1 and idx > 0:
+        if iter_num < geom_dat['iter_num'][idx - 1] and idx > 0:
             iter_num_offset += geom_dat['iter_num'][idx - 1]
 
         castep_dat['geom']['iterations'][iter_num + iter_num_offset].update({
