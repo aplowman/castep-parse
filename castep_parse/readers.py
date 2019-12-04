@@ -491,13 +491,15 @@ def read_cell_file(path_or_file, ret_frac=False):
 def merge_geom_data(castep_dat, geom_dat):
     'Merge data from a .geom file into data from a .castep file.'
 
-    iter_num_offset = 0
+    iterations_idx = -1
     for idx, iter_num in enumerate(geom_dat['iter_num']):
+        
+        iterations_idx += 1
+        while (iter_num != castep_dat['geom']['iterations'][iterations_idx]['iter_num']):
+            iterations_idx += 1
 
-        if iter_num < geom_dat['iter_num'][idx - 1] and idx > 0:
-            iter_num_offset += geom_dat['iter_num'][idx - 1]
-
-        castep_dat['geom']['iterations'][iter_num + iter_num_offset].update({
+        # print('updating geom for iteration idx: {}'.format(iterations_idx))
+        castep_dat['geom']['iterations'][iterations_idx].update({
             'cell':         geom_dat['cells'][idx],
             'energy':       geom_dat['energies'][idx],
             'free_energy':  geom_dat['free_energies'][idx],
@@ -743,6 +745,7 @@ def parse_castep_run(run_str, run_idx):
         final_geom_str = None
         geom_initial_str = geom_iters_split[0]
         geom_initial = {
+            'iter_num': 0,
             'resources': parse_castep_file_resource_estimates(geom_initial_str),
             'forces': parse_castep_file_forces(geom_initial_str),
             **parse_castep_file_geom_iter_info(geom_initial_str),
@@ -1300,9 +1303,14 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
     patt_geom_iter_step = r'(-{80}\n\s[L]?BFGS: (?:starting|improving) iteration.*\n-{80})'
     patt_finished_iter = r'([L]?BFGS: finished iteration.*)'
 
-    iter_steps_split = re.split(patt_geom_iter_step, geom_iter_str)[1:]
+    iter_steps_split = re.split(patt_geom_iter_step, geom_iter_str)
+    iter_begin_str = iter_steps_split.pop(0)
+
     iter_steps_str_list = [i + j for i,
                            j in zip(iter_steps_split[::2], iter_steps_split[1::2])]
+
+    iter_num_str = re.search(r'Starting [L]?BFGS iteration\s+([0-9]+)', iter_begin_str).groups()[0]
+    iter_num = int(iter_num_str)
 
     # Remove iteration ending bit:
     final_step_str, fin_iter_str, iter_end_str = re.split(
@@ -1313,6 +1321,7 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
 
     out = {
         **final,
+        'iter_num': iter_num,
         'steps': [],
     }
     for step_idx, i in enumerate(iter_steps_str_list):
