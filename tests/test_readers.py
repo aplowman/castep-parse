@@ -51,6 +51,8 @@ class ReadersTestCase(unittest.TestCase):
 class ReadStructureTestCase(unittest.TestCase):
     'Checking for consistency between cell and geom file readers.'
 
+    # TODO: add check that final geom structure matches -out.cell structure
+
     def test_initial_structure_consistency(self):
         'Check cell file structure is equivalent to first structure reported in geom file'
 
