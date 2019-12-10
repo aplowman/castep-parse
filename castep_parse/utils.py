@@ -53,27 +53,26 @@ def find_files_in_dir(dir_path, match_regex, recursive=False):
 
 
 def map_species_to_castep(species, species_idx):
-    """Generate an index array that maps a species index array in the same way 
-    that CASTEP internally reorders atoms.
+    """Generate an index array that maps a species index array in the same way that CASTEP
+    internally reorders atoms.
 
     Parameters
     ----------
     species : ndarray of shape (N, ) of str
         Unique chemical symbols indexed by `species_idx`.
     species_idx : ndarray of shape (M, ) of int
-        Indices into `species` such that `species[species_idx]` produces an
-        array of all atom species in the system.
+        Indices into `species` such that `species[species_idx]` produces an array of all
+        atom species in the system.
 
     Returns
     -------
     map_idx : ndarray of shape (M, ) of int
-        Index array which reorders `species_idx`
+        Index array that reorders `species_idx`
 
     Notes
     -----
-    CASTEP orders atoms first by atomic number (proton number) and then by 
-    their original order. This function can be used to reorder atom coordinates
-    in this way.
+    CASTEP orders atoms first by atomic number (proton number) and then by their original
+    order. This function can be used to reorder atom coordinates in this way.
 
     """
 

@@ -1,5 +1,20 @@
 # Change Log
 
+## [0.2.1] - 2019.12.10
+
+## Added
+
+- Added function `merge_cell_data` to merge outputs from `read_cell_file` with those from `read_castep_file`.
+
+## Fixed
+
+- Fixed white space issue in parsing forces block in .castep file.
+- Fixed bug in parsing .castep file when geometry <frequency> is unchanged from its initial value.
+- Fixed bug in parsing .castep file when there is an initial SCF cycle on continuation of a geometry optimisation.
+- Only add final info to run `dict` if the final info includes the total time string.
+- Fixed issue when adding up total time if no previous SCF cycle to get last time from.
+- Skip runs if they don't include the string "Cell Contents"
+
 ## [0.2.0] - 2019.11.22
 
 ## Changed

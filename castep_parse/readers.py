@@ -6,7 +6,7 @@ from warnings import warn
 
 import numpy as np
 
-from castep_parse.utils import find_files_in_dir, flexible_open
+from castep_parse.utils import find_files_in_dir, flexible_open, map_species_to_castep
 
 __all__ = [
     'read_castep_file',
@@ -14,6 +14,8 @@ __all__ = [
     'read_cell_file',
     'read_output_files',
     'merge_geom_data',
+    'merge_cell_data',
+    'merge_output_data',
     'read_relaxation',
 ]
 
@@ -29,8 +31,8 @@ def read_castep_file(path_or_file):
 
     Notes
     -----
-    The `flexible_open` decorator ensure the `path_or_file` object is converted to a list
-    or strings.
+    The `flexible_open` decorators ensure the `path_or_file` object is converted to a list
+    of strings.
 
     """
 
@@ -55,6 +57,10 @@ def read_castep_file(path_or_file):
 
     for run_idx, run_str in enumerate(runs_list):
 
+        if 'Cell Contents' not in run_str:
+            warn('Skipping run {}, looks incomplete.'.format(run_idx))
+            continue
+
         run = parse_castep_run(run_str, run_idx)
 
         # Extract out SCF and SCF energies
@@ -78,9 +84,13 @@ def read_castep_file(path_or_file):
             total_time += t
 
         else:
-            # Add on the last-recorded SCF time:
-            t = run['geom']['iterations'][-1]['steps'][-1]['scf'][-1, -1]
-            total_time += t
+            # Add on the last-recorded SCF time (of completed geom iterations):
+            all_iters = run['geom']['iterations']
+            if all_iters:
+                final_step = all_iters[-1]['steps'][-1]
+                if 'scf' in final_step:
+                    t = final_step['scf'][-1, -1]
+                    total_time += t
 
         if 'geom' in run:
 
@@ -155,8 +165,8 @@ def read_geom_file(path_or_file):
 
     Notes
     -----
-    The `flexible_open` decorator ensure the `path_or_file` object is converted to a list
-    or strings.
+    The `flexible_open` decorator ensures the `path_or_file` object is converted to a list
+    of strings.
 
     The .geom file includes the main results at the end of each BFGS step. All quantities
     in the .geom file are expressed in atomic units. Returned data is in eV (energies),
@@ -399,8 +409,8 @@ def read_cell_file(path_or_file, ret_frac=False):
 
     Notes
     -----
-    The `flexible_open` decorator ensure the `path_or_file` object is converted to a list
-    or strings.
+    The `flexible_open` decorator ensures the `path_or_file` object is converted to a list
+    of strings.
 
     """
 
@@ -481,13 +491,15 @@ def read_cell_file(path_or_file, ret_frac=False):
 def merge_geom_data(castep_dat, geom_dat):
     'Merge data from a .geom file into data from a .castep file.'
 
-    iter_num_offset = 0
+    iterations_idx = -1
     for idx, iter_num in enumerate(geom_dat['iter_num']):
+        
+        iterations_idx += 1
+        while (iter_num != castep_dat['geom']['iterations'][iterations_idx]['iter_num']):
+            iterations_idx += 1
 
-        if iter_num == 1 and idx > 1:
-            iter_num_offset += geom_dat['iter_num'][idx - 1]
-
-        castep_dat['geom']['iterations'][iter_num + iter_num_offset].update({
+        # print('updating geom for iteration idx: {}'.format(iterations_idx))
+        castep_dat['geom']['iterations'][iterations_idx].update({
             'cell':         geom_dat['cells'][idx],
             'energy':       geom_dat['energies'][idx],
             'free_energy':  geom_dat['free_energies'][idx],
@@ -501,6 +513,41 @@ def merge_geom_data(castep_dat, geom_dat):
             })
 
         castep_dat['geom']['species'] = geom_dat['species'][geom_dat['species_idx']]
+
+    return castep_dat
+
+
+def merge_cell_data(castep_dat, cell_dat):
+    'Merge data from a .cell file into data from a .castep file.'
+
+    # Reorder .cell atoms into order expected in .geom file or an output .cell file:
+
+    species = cell_dat['species']
+    species_idx_old = cell_dat['species_idx']
+
+    species_map = map_species_to_castep(species, species_idx_old)
+    species_idx = species_idx_old[species_map]
+    species_all = species[species_idx]
+
+    castep_dat.update({
+        'structure': {
+            'atoms': cell_dat['atom_sites'],
+            'supercell': cell_dat['supercell'],
+            'species': species_all,
+        }
+    })
+
+    return castep_dat
+
+
+def merge_output_data(castep_dat, geom_dat=None, cell_dat=None):
+    'Merge .geom and/or .cell data with .castep file data'
+
+    if geom_dat:
+        castep_dat = merge_geom_data(castep_dat, geom_dat)
+
+    if cell_dat:
+        castep_dat = merge_cell_data(castep_dat, cell_dat)
 
     return castep_dat
 
@@ -648,7 +695,7 @@ def parse_castep_run(run_str, run_idx):
     pat_params = r'((?:\s\*{36}\sTitle\s\*{36})|(?:\s\*{79}\n))'
     pat_geom_iter_delim = r'(={80}\n\sStarting [L]?BFGS iteration\s+[0-9]+.+\n={80})'
     pat_finished_geom = r'[L]?BFGS: Geometry optimization completed successfully.'
-    pat_final_geom_end = r'([L]?BFGS: Final (<frequency>|bulk modulus)\s+=\s+.*)'
+    pat_final_geom_end = r'([L]?BFGS: Final (<frequency>|bulk modulus)\s+(?:=|unchanged)\s+.*)'
 
     header_split = re.split(pat_header, run_str)
     header_str = ''.join([header_split[i] for i in [1, 2, 3, 4, 5]])
@@ -679,16 +726,16 @@ def parse_castep_run(run_str, run_idx):
 
     elif parameters['general_parameters']['type_of_calculation'] == 'geometry optimization':
 
-        is_restart = bool(parameters['general_parameters'].get('continuing_from'))
-
         run_info_split = re.split(
             r'(\+-{16} MEMORY AND SCRATCH DISK ESTIMATES PER PROCESS -{14}\+)', remainder_str)
-        if is_restart:
-            run_info_str = run_info_split[0]
-            remainder_str = run_info_split[1] + run_info_split[2]
-        else:
+
+        initial_SCF = '<-- SCF' in run_info_split[2][:1500]
+        if initial_SCF:
             run_info_str = run_info_split[0] + run_info_split[1] + run_info_split[2]
             remainder_str = run_info_split[3] + run_info_split[4]
+        else:
+            run_info_str = run_info_split[0]
+            remainder_str = run_info_split[1] + run_info_split[2]
 
         # Extract out geom iterations:
         geom_iters_split = re.split(pat_geom_iter_delim, remainder_str)
@@ -698,6 +745,7 @@ def parse_castep_run(run_str, run_idx):
         final_geom_str = None
         geom_initial_str = geom_iters_split[0]
         geom_initial = {
+            'iter_num': 0,
             'resources': parse_castep_file_resource_estimates(geom_initial_str),
             'forces': parse_castep_file_forces(geom_initial_str),
             **parse_castep_file_geom_iter_info(geom_initial_str),
@@ -719,14 +767,20 @@ def parse_castep_run(run_str, run_idx):
             if freq_or_mod == '<frequency>':
                 final_cell_conts = parse_castep_file_cell_contents(
                     final_geom_str, is_initial=False)
-                final_freq = float(geom_freq_mod_str.strip().split()[-2])
+                try:
+                    final_freq = float(geom_freq_mod_str.strip().split()[-2])
+                except ValueError:
+                    final_freq = None
                 geom_final.update({
                     'cell_contents': final_cell_conts,
                     'final_frequency': final_freq,
                 })
             elif freq_or_mod == 'bulk modulus':
                 final_cell = parse_castep_file_unit_cell(final_geom_str, is_initial=False)
-                final_bulk_mod = float(geom_freq_mod_str.strip().split()[-2])
+                try:
+                    final_bulk_mod = float(geom_freq_mod_str.strip().split()[-2])
+                except ValueError:
+                    final_freq = None
                 geom_final.update({
                     'unit_cell': final_cell,
                     'bulk_modulus': final_bulk_mod,
@@ -783,7 +837,7 @@ def parse_castep_run(run_str, run_idx):
             'scf_energies': run_info['scf_energies'],
         })
 
-    if end_str:
+    if end_str and ('Total time' in end_str):
         final_info = parse_castep_file_final_info(end_str)
         run.update({'final_info': final_info})
 
@@ -1087,7 +1141,7 @@ def parse_castep_file_forces(forces_str):
         raise ValueError('Cannot parse forces block: \n"{!s}"'.format(forces_str))
 
     # Now split so we get the "body" of the block:
-    pat_forces = r'(?:\* (?:-{45}|-{56}|-{80}) \*)|(?: (?:\*{84}|\*{60}|\*{49}))'
+    pat_forces = r'(?:\* (?:-{45}|-{56}|-{80}) \*)|(?:\s(?:\*{84}|\*{60}|\*{49})[^\*]*)'
     forces_body = re.split(pat_forces, forces_str)[1]
     forces_lines = forces_body.strip().split('\n')[2:-1]
     lns_ss = [i.strip().split() for i in forces_lines]
@@ -1249,9 +1303,14 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
     patt_geom_iter_step = r'(-{80}\n\s[L]?BFGS: (?:starting|improving) iteration.*\n-{80})'
     patt_finished_iter = r'([L]?BFGS: finished iteration.*)'
 
-    iter_steps_split = re.split(patt_geom_iter_step, geom_iter_str)[1:]
+    iter_steps_split = re.split(patt_geom_iter_step, geom_iter_str)
+    iter_begin_str = iter_steps_split.pop(0)
+
     iter_steps_str_list = [i + j for i,
                            j in zip(iter_steps_split[::2], iter_steps_split[1::2])]
+
+    iter_num_str = re.search(r'Starting [L]?BFGS iteration\s+([0-9]+)', iter_begin_str).groups()[0]
+    iter_num = int(iter_num_str)
 
     # Remove iteration ending bit:
     final_step_str, fin_iter_str, iter_end_str = re.split(
@@ -1262,6 +1321,7 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
 
     out = {
         **final,
+        'iter_num': iter_num,
         'steps': [],
     }
     for step_idx, i in enumerate(iter_steps_str_list):
@@ -1273,7 +1333,7 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
 
 def parse_castep_file_final_info(final_str):
 
-    pat_forces = r'(\*{84}|\*{60}|\*{49})'
+    pat_forces = r'\s((?:\*{84}|\*{60}|\*{49})[^\*])'
     forces_split = re.split(pat_forces, final_str)
 
     forces_str_list = [''.join(forces_split[i:i+2])

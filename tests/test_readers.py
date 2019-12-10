@@ -23,10 +23,65 @@ from castep_parse.readers import (
     parse_castep_file_run_info,
     parse_castep_file_run_stats,
     parse_castep_file_kpoint_info,
+    parse_castep_file_final_info
 )
 from castep_parse.utils import array_nan_equal
 
 ROOT_FILES_PATH = os.path.join('tests', 'castep_files')
+
+
+class ReadersTestCase(unittest.TestCase):
+    'Just checking the test files can be parsed without incident.'
+
+    def test_read_castep(self):
+        cst_out_1 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.castep'))
+        cst_out_2 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.castep'))
+        cst_out_3 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'SP.castep'))
+
+    def test_read_geom(self):
+        geom_1 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.geom'))
+        geom_2 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.geom'))
+
+    def test_read_cell(self):
+        cell_1 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.cell'))
+        cell_2 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.cell'))
+        cell_3 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'SP.cell'))
+
+
+class ReadStructureTestCase(unittest.TestCase):
+    'Checking for consistency between cell and geom file readers.'
+
+    # TODO: add check that final geom structure matches -out.cell structure
+
+    def test_initial_structure_consistency(self):
+        'Check cell file structure is equivalent to first structure reported in geom file'
+
+        def check_consistent(cell_dat, geom_dat):
+
+            self.assertTrue(np.allclose(geom_dat['cells'][0], cell_dat['supercell']))
+
+            atm_c = cell_dat['atom_sites']
+            atm_c_srt_idx = np.lexsort(np.round(atm_c, decimals=7))
+            atm_c_srt = atm_c[:, atm_c_srt_idx]
+            species_c = cell_dat['species'][cell_dat['species_idx']]
+            species_c_srt = species_c[atm_c_srt_idx]
+
+            atm_g = geom_dat['atoms'][0]
+            atm_g_srt_idx = np.lexsort(np.round(atm_g, decimals=7))
+            atm_g_srt = atm_g[:, atm_g_srt_idx]
+            species_g = geom_dat['species'][geom_dat['species_idx']]
+            species_g_srt = species_g[atm_g_srt_idx]
+
+            self.assertTrue(np.allclose(atm_c_srt, atm_g_srt))
+            self.assertTrue(np.array_equal(species_c_srt, species_g_srt))
+
+        cell_1 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.cell'))
+        geom_1 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.geom'))
+        check_consistent(cell_1, geom_1)
+
+        cell_2 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.cell'))
+        geom_2 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.geom'))
+        check_consistent(cell_2, geom_2)
 
 
 class FlexibleOpenTestCase(unittest.TestCase):
@@ -599,7 +654,7 @@ class CastepFileParsersTestCase(unittest.TestCase):
             *                                               *
             *  Pressure:   -4.6095                          *
             *                                               *
-            *************************************************    
+            *************************************************
         """
 
         stress = parse_castep_file_forces(stress_str)
@@ -666,3 +721,96 @@ class CastepFileParsersTestCase(unittest.TestCase):
         self.assertTrue(np.isclose(geom_iter_info['dE_per_ion'], 6.479173e-7))
         self.assertTrue(np.isclose(geom_iter_info['mag_F_max'], 2.296894e-2))
         self.assertTrue(np.isclose(geom_iter_info['mag_dR_max'], 1.033643e-3))
+
+    def test_parse_castep_file_final_info(self):
+        'Check end of run info parsing.'
+
+        end_str = """  
+            **********************************************************
+            *** There were at least     2 warnings during this run ***
+            *** => please check the whole of this file carefully!  ***
+            **********************************************************
+            
+            ******************* Unconstrained Forces *******************
+            *                                                          *
+            *               Cartesian components (eV/A)                *
+            * -------------------------------------------------------- *
+            *                         x            y            z      *
+            *                                                          *
+            * Zr              1      0.00073      0.00101     -0.00055 *
+            * Zr            102      0.00018      0.00002     -0.00114 *
+            * I               1     -0.00110      0.00831     -0.00440 *
+            * Cs              1     -0.00057     -0.00270      0.00262 *
+            *                                                          *
+            ************************************************************
+            
+            ******************************** Constrained Forces ********************************
+            *                                                                                  *
+            *                           Cartesian components (eV/A)                            *
+            * -------------------------------------------------------------------------------- *
+            *                         x                    y                    z              *
+            *                                                                                  *
+            * Zr              1      0.00073              0.00101             -0.00055         *
+            * Zr            102      0.00018              0.00002             -0.00114         *
+            * I               1     -0.00110              0.00831             -0.00440         *
+            * Cs              1     -0.00057             -0.00270              0.00262         *
+            *                                                                                  *
+            ************************************************************************************
+            
+            Pseudo atomic calculation performed for Zr 4s2 4p6 4d2 5s2
+            
+            Converged in 30 iterations to a total energy of -1285.7947 eV
+            
+            
+            Pseudo atomic calculation performed for I 5s2 5p5
+            
+            Converged in 19 iterations to a total energy of -794.3080 eV
+            
+            
+            Pseudo atomic calculation performed for Cs 5s2 5p6 6s1
+            
+            Converged in 28 iterations to a total energy of -774.1356 eV
+            
+            Charge spilling parameter for spin component 1 = 0.09%
+            
+                Atomic Populations (Mulliken)
+                -----------------------------
+            Species          Ion     s      p      d      f     Total  Charge (e)
+            =====================================================================
+            Zr              1     2.42   6.73   2.86   0.00  12.00    -0.00
+            Zr            102     2.42   6.73   2.86   0.00  12.00    -0.00
+            I               1     1.95   4.80   0.00   0.00   6.75     0.25
+            Cs              1     1.38   4.61   0.00   0.00   5.99     3.01
+            =====================================================================
+            
+                            Bond                   Population      Length (A)
+            ======================================================================
+                        Zr 78  -- Zr 81                  0.34        2.86246
+                        Zr 50  -- Zr 82                  0.26        2.96191
+                        Zr 47  -- Zr 50                  0.26        2.98562
+                        Zr 21  -- I 1                   -0.82        2.99163
+            ======================================================================
+            
+
+            Writing analysis data to sim.castep_bin
+
+            Writing model to sim.check
+            
+            A BibTeX formatted list of references used in this run has been written to 
+            sim.bib
+            
+            Initialisation time =     84.43 s
+            Calculation time    =  28599.24 s
+            Finalisation time   =     92.02 s
+            Total time          =  28775.69 s
+            Peak Memory Use     = 3783120 kB
+            
+            Overall parallel efficiency rating: Good (77%)                                  
+            
+            Data was distributed by:-
+            G-vector (2-way); efficiency rating: Very good (88%)                            
+            k-point (8-way); efficiency rating: Very good (86%)                             
+
+            """
+
+        parse_castep_file_final_info(end_str)
