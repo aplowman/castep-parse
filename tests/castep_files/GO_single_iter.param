@@ -1,0 +1,15 @@
+cut_off_energy           = 360 eV
+elec_energy_tol          = 1e-7
+geom_energy_tol          = 1e-6
+geom_force_tol           = 1e-2
+geom_max_iter            = 200
+geom_method              = LBFGS
+max_scf_cycles           = 200
+metals_method            = DM
+mixing_scheme            = Pulay
+opt_strategy             = speed
+smearing_width           = 0.1 eV
+task                     = GeometryOptimisation
+write_cell_structure     = True
+write_formatted_density  = True
+xc_functional            = PBE

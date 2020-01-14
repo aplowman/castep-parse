@@ -37,15 +37,18 @@ class ReadersTestCase(unittest.TestCase):
         cst_out_1 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.castep'))
         cst_out_2 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.castep'))
         cst_out_3 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'SP.castep'))
+        cst_out_4 = read_castep_file(os.path.join(ROOT_FILES_PATH, 'GO_single_iter.castep'))
 
     def test_read_geom(self):
         geom_1 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.geom'))
         geom_2 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.geom'))
+        geom_3 = read_geom_file(os.path.join(ROOT_FILES_PATH, 'GO_single_iter.geom'))
 
     def test_read_cell(self):
         cell_1 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_cell.cell'))
         cell_2 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_max_geom.cell'))
         cell_3 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'SP.cell'))
+        cell_4 = read_cell_file(os.path.join(ROOT_FILES_PATH, 'GO_single_iter.cell'))
 
 
 class ReadStructureTestCase(unittest.TestCase):

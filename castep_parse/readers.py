@@ -493,7 +493,7 @@ def merge_geom_data(castep_dat, geom_dat):
 
     iterations_idx = -1
     for idx, iter_num in enumerate(geom_dat['iter_num']):
-        
+
         iterations_idx += 1
         while (iter_num != castep_dat['geom']['iterations'][iterations_idx]['iter_num']):
             iterations_idx += 1
@@ -729,13 +729,17 @@ def parse_castep_run(run_str, run_idx):
         run_info_split = re.split(
             r'(\+-{16} MEMORY AND SCRATCH DISK ESTIMATES PER PROCESS -{14}\+)', remainder_str)
 
-        initial_SCF = '<-- SCF' in run_info_split[2][:1500]
-        if initial_SCF:
+        if len(run_info_split) == 5:
+            initial_SCF = True
             run_info_str = run_info_split[0] + run_info_split[1] + run_info_split[2]
             remainder_str = run_info_split[3] + run_info_split[4]
-        else:
+        elif len(run_info_split) == 3:
+            initial_SCF = False
             run_info_str = run_info_split[0]
             remainder_str = run_info_split[1] + run_info_split[2]
+        else:
+            msg = 'Cannot parse run info for run idx {}'.format(run_idx)
+            raise NotImplementedError(msg)
 
         # Extract out geom iterations:
         geom_iters_split = re.split(pat_geom_iter_delim, remainder_str)
@@ -747,18 +751,25 @@ def parse_castep_run(run_str, run_idx):
         geom_initial = {
             'iter_num': 0,
             'resources': parse_castep_file_resource_estimates(geom_initial_str),
-            'forces': parse_castep_file_forces(geom_initial_str),
-            **parse_castep_file_geom_iter_info(geom_initial_str),
         }
 
+        if initial_SCF:
+            geom_initial.update({
+                'forces': parse_castep_file_forces(geom_initial_str),
+                **parse_castep_file_geom_iter_info(geom_initial_str),
+            })
+
+        geom_final_str = geom_iters_str_list[-1] if geom_iters_str_list else remainder_str
+
         geom_final = {}
-        if re.search(pat_finished_geom, geom_iters_str_list[-1]):
+        if re.search(pat_finished_geom, geom_final_str):
             # The geometry optimisation is finished in this run
 
             print('Geometry optimisation finished in run {}'.format(run_idx))
 
-            final_iter_str, end_str = re.split(pat_finished_geom, geom_iters_str_list[-1])
-            geom_iters_str_list[-1] = final_iter_str
+            final_iter_str, end_str = re.split(pat_finished_geom, geom_final_str)
+            if geom_iters_str_list:
+                geom_iters_str_list[-1] = final_iter_str
 
             final_geom_str, geom_freq_mod_str, freq_or_mod, end_str = re.split(
                 pat_final_geom_end, end_str)
@@ -812,11 +823,12 @@ def parse_castep_run(run_str, run_idx):
                 }
             )
 
-        for geom_idx, geom_iter_str in enumerate(geom_iters_str_list, 1):
+        if geom_iters_str_list:
+            for geom_idx, geom_iter_str in enumerate(geom_iters_str_list, 1):
 
-            if 'BFGS: finished iteration' not in geom_iter_str:
-                continue
-            geom_iters.append(parse_castep_file_geom_iter(geom_iter_str, parameters))
+                if 'BFGS: finished iteration' not in geom_iter_str:
+                    continue
+                geom_iters.append(parse_castep_file_geom_iter(geom_iter_str, parameters))
 
         run.update({
             'geom': {
@@ -1309,7 +1321,8 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
     iter_steps_str_list = [i + j for i,
                            j in zip(iter_steps_split[::2], iter_steps_split[1::2])]
 
-    iter_num_str = re.search(r'Starting [L]?BFGS iteration\s+([0-9]+)', iter_begin_str).groups()[0]
+    iter_num_str = re.search(
+        r'Starting [L]?BFGS iteration\s+([0-9]+)', iter_begin_str).groups()[0]
     iter_num = int(iter_num_str)
 
     # Remove iteration ending bit:
