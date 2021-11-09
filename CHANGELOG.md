@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.2.3] - 2021.xx.xx
+
+### Added
+
+- Added function `read_den_fmt`.
+
+## [0.2.2] - 2020.01.15
+
+### Fixed
+
+- Fix reading CASTEP file for some types of incomplete run.
+
 ## [0.2.1] - 2019.12.10
 
 ## Added

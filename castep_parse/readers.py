@@ -17,6 +17,7 @@ __all__ = [
     'merge_cell_data',
     'merge_output_data',
     'read_relaxation',
+    'read_den_fmt',
 ]
 
 
@@ -1385,5 +1386,58 @@ def parse_castep_file_run_stats(stats_str):
                 'kpoint_distribution': ln_s.split('(')[1].split(')')[0],
                 'kpoint_parallel_efficiency': ln_s.split(':')[1].strip(),
             })
+
+    return out
+
+
+def read_den_fmt(path):
+
+    mode = 'scan'
+    sup = []
+    grid_size = None
+    density = []
+
+    with Path(path).open('r') as handle:
+        lines = handle.readlines()
+
+    for ln in lines:
+
+        ln_s = ln.split()
+
+        if mode == 'scan' and ln_s:
+
+            if 'Real' in ln_s[0]:
+                mode = 'supercell'
+
+            elif '! fine FFT grid along <a,b,c>' in ln:
+                grid_size = [int(i) for i in ln_s[0:3]]
+
+            elif 'END header' in ln:
+                mode = 'density_pre'
+
+        elif mode == 'supercell':
+            if ln_s:
+                sup_row = [float(i) for i in ln_s[0:3]]
+                sup.append(sup_row)
+            else:
+                mode = 'scan'
+
+        elif mode == 'density_pre' and not ln_s:
+            density = np.zeros(tuple(grid_size))
+            mode = 'density'
+
+        elif mode == 'density':
+            idx, dens = ln_s[0:3], float(ln_s[3])
+            idx = tuple([int(i) - 1 for i in idx])
+            density[idx] = dens
+
+    # Return supercell as matric of column vectors:
+    sup = np.array(sup).T
+
+    out = {
+        'supercell': sup,
+        'grid_size': grid_size,
+        'density': density,
+    }
 
     return out
