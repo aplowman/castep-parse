@@ -401,3 +401,11 @@ def array_nan_equal(a, b):
         return False
     else:
         return np.allclose(a[nonan_a], b[nonan_a])
+
+
+def merge_str_list(lst, merge_idx_start, merge_idx_end):
+    return (
+        lst[:merge_idx_start] +
+        [''.join(lst[merge_idx_start: merge_idx_end])] +
+        lst[merge_idx_end:]
+    )

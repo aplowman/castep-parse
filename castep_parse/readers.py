@@ -6,7 +6,12 @@ from warnings import warn
 
 import numpy as np
 
-from castep_parse.utils import find_files_in_dir, flexible_open, map_species_to_castep
+from castep_parse.utils import (
+    find_files_in_dir,
+    flexible_open,
+    map_species_to_castep,
+    merge_str_list,
+)
 
 __all__ = [
     'read_castep_file',
@@ -44,6 +49,17 @@ def read_castep_file(path_or_file):
     file_str = '\n'.join(path_or_file)
 
     header_split = re.split(pat_header, file_str)[1:]
+    runs_list = [''.join(header_split[i:i + 6]) for i in range(0, len(header_split), 6)]
+
+    # Merge DFTP headers if present:
+    dftp_header_idx = []
+    for i in range(0, len(header_split), 6):
+        if '|  D D D D    F F F F F  P P P P     T T T T T    |' in header_split[i + 1]:
+            dftp_header_idx.append(i)
+
+    for i in dftp_header_idx:
+        header_split = merge_str_list(header_split, i - 1, i + 6)
+
     runs_list = [''.join(header_split[i:i + 6]) for i in range(0, len(header_split), 6)]
 
     runs = []
@@ -84,7 +100,7 @@ def read_castep_file(path_or_file):
             t = run['final_info']['statistics']['total_time_s']
             total_time += t
 
-        else:
+        elif 'geom' in run:
             # Add on the last-recorded SCF time (of completed geom iterations):
             all_iters = run['geom']['iterations']
             if all_iters:
@@ -92,8 +108,6 @@ def read_castep_file(path_or_file):
                 if 'scf' in final_step:
                     t = final_step['scf'][-1, -1]
                     total_time += t
-
-        if 'geom' in run:
 
             run_geom_iters = run['geom'].pop('iterations')
 
@@ -494,7 +508,7 @@ def merge_geom_data(castep_dat, geom_dat):
 
     iterations_idx = -1
     for idx, iter_num in enumerate(geom_dat['iter_num']):
-        
+
         iterations_idx += 1
         while (iter_num != castep_dat['geom']['iterations'][iterations_idx]['iter_num']):
             iterations_idx += 1
@@ -700,7 +714,7 @@ def parse_castep_run(run_str, run_idx):
 
     header_split = re.split(pat_header, run_str)
     header_str = ''.join([header_split[i] for i in [1, 2, 3, 4, 5]])
-    remainder_str = header_split[6]
+    remainder_str = header_split[len(header_split) - 1]  # accounts for DFPT header
     header = parse_castep_file_header(header_str)
 
     # TODO: parse pseudopotential section
@@ -826,6 +840,10 @@ def parse_castep_run(run_str, run_idx):
                 'iterations': geom_iters,
             }
         })
+
+    elif parameters['general_parameters']['type_of_calculation'] == 'Phonon followed by E-field':
+        print('parsign phonon shizz')
+        run_info_str = remainder_str
 
     run_info = parse_castep_file_run_info(run_info_str, parameters)
 
@@ -1310,7 +1328,8 @@ def parse_castep_file_geom_iter(geom_iter_str, parameters):
     iter_steps_str_list = [i + j for i,
                            j in zip(iter_steps_split[::2], iter_steps_split[1::2])]
 
-    iter_num_str = re.search(r'Starting [L]?BFGS iteration\s+([0-9]+)', iter_begin_str).groups()[0]
+    iter_num_str = re.search(
+        r'Starting [L]?BFGS iteration\s+([0-9]+)', iter_begin_str).groups()[0]
     iter_num = int(iter_num_str)
 
     # Remove iteration ending bit:
