@@ -943,6 +943,7 @@ def parse_castep_file_run_info(run_info_str, parameters):
         'cell_contents': parse_castep_file_cell_contents(cell_contents_str, is_initial=True),
         'unit_cell': parse_castep_file_unit_cell(unit_cell_str, is_initial=True),
         'kpoints': parse_castep_file_kpoint_info(kpoints_str),
+        'symmetry': parse_castep_file_symmetry(symm_str)
     }
 
     if len(info_list) == 6:
@@ -1009,6 +1010,14 @@ def parse_castep_file_kpoint_info(kpoint_info_str):
         out.update({'kpoint_num': int(lns_s[1][-1])})
         warnings.warn('Could not parse kpoint MP grid offset.')
 
+    return out
+
+
+def parse_castep_file_symmetry(sym_str):
+    pnt_group = re.search(r'Point\ group\ of\ crystal\ = (.*)', sym_str).group(1).strip()
+    out = {
+        'point_group': pnt_group,
+    }
     return out
 
 
