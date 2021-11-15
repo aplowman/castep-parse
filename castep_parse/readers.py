@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 from warnings import warn
+import warnings
 
 import numpy as np
 
@@ -991,16 +992,22 @@ def parse_castep_file_run_info(run_info_str, parameters):
 
 def parse_castep_file_kpoint_info(kpoint_info_str):
 
-    body_str = re.split(r'[^\S\n]+-{31}\n', kpoint_info_str)[2]
+    body_str = re.split(r'[^\S\n]+-{31}|\+{55}\n', kpoint_info_str)[2]
+    # Splitting on "+" is for where there is a k-point table (only earlier versions?)
+
     body_lns = body_str.strip().split('\n')[:3]
 
     lns_s = [ln.strip().split() for ln in body_lns]
 
-    out = {
-        'kpoint_MP_grid': [int(lns_s[0][i]) for i in [-3, -2, -1]],
-        'kpoint_MP_offset': [float(lns_s[1][i]) for i in [-3, -2, -1]],
-        'kpoint_num': int(lns_s[2][-1])
-    }
+    out = {'kpoint_MP_grid': [int(lns_s[0][i]) for i in [-3, -2, -1]]}
+    if len(lns_s) == 3:
+        out.update({
+            'kpoint_MP_offset': [float(lns_s[1][i]) for i in [-3, -2, -1]],
+            'kpoint_num': int(lns_s[2][-1])
+        })
+    else:
+        out.update({'kpoint_num': int(lns_s[1][-1])})
+        warnings.warn('Could not parse kpoint MP grid offset.')
 
     return out
 
