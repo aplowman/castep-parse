@@ -1049,12 +1049,15 @@ def parse_castep_file_unit_cell(unit_cell_str, is_initial):
     }
 
     if is_initial:
-        cell_dens_amu_ang = float(lns_s[11][2])
-        cell_dens_g_cm = float(lns_s[12][1])
-        out.update({
-            'cell_density_AMU/Ang**3': cell_dens_amu_ang,
-            'cell_density_g/cm**3': cell_dens_g_cm,
-        })
+        try:
+            cell_dens_amu_ang = float(lns_s[11][2])
+            cell_dens_g_cm = float(lns_s[12][1])
+            out.update({
+                'cell_density_AMU/Ang**3': cell_dens_amu_ang,
+                'cell_density_g/cm**3': cell_dens_g_cm,
+            })
+        except:
+            warnings.warn('Could not parse unit cell densities.')
 
     return out
 
