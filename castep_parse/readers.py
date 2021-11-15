@@ -1084,7 +1084,7 @@ def parse_castep_file_resource_estimates(estimates_str):
     return out
 
 
-def parse_castep_file_cell_contents(cell_contents_str, is_initial, parse_species=False):
+def parse_castep_file_cell_contents(cell_contents_str, is_initial):
 
     if is_initial:
         patt = r'x-{58}x|x{60}'
@@ -1094,13 +1094,21 @@ def parse_castep_file_cell_contents(cell_contents_str, is_initial, parse_species
     single_cell_split = re.split(patt, cell_contents_str)
     cell_lines = single_cell_split[2].strip().split('\n')
     atom_frac_coords = []
+    elements = []
+    atom_numbers = []
     for ln in cell_lines:
         ln_s = ln.strip().split()
+        elements.append(ln_s[1])
+        atom_numbers.append(int(ln_s[2]))
         atom_frac_coords.append([float(ln_s[i]) for i in [3, 4, 5]])
 
-    # TODO atom species
+    out = {
+        'element': np.array(elements),
+        'atom_number': np.array(atom_numbers),
+        'fractional_atom_coords': np.array(atom_frac_coords),
+    }
 
-    return np.array(atom_frac_coords)
+    return out
 
 
 def parse_castep_file_scf(scf_str, is_metallic):
