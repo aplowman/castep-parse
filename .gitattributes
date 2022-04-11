@@ -1,1 +1,1 @@
-tests/castep_files/ linguist-vendored
+tests/castep_files/* linguist-generated=true

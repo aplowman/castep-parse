@@ -14,11 +14,11 @@
 
 ## [0.2.1] - 2019.12.10
 
-## Added
+### Added
 
 - Added function `merge_cell_data` to merge outputs from `read_cell_file` with those from `read_castep_file`.
 
-## Fixed
+### Fixed
 
 - Fixed white space issue in parsing forces block in .castep file.
 - Fixed bug in parsing .castep file when geometry <frequency> is unchanged from its initial value.
@@ -29,29 +29,29 @@
 
 ## [0.2.0] - 2019.11.22
 
-## Changed
+### Changed
 
 - `read_castep_file` is now more logical and testable (but less-performant). Instead of iterating over lines in the .castep file, it splits it into sections and parsing individual blocks. This means it handles much better the situation a CASTEP run has been continued and the output is appended to the same .castep file as the original run.
 - Use of `flexible_open` decorator is now more limited but better defined. In particular, the functions `read_castep_file`, `read_geom_file` and `read_cell_file` accept as their "file" input argument one of these types: `str`, `pathlib.Path`, `bytes` or `TextIOWrapper`. If a string or `Path` object, it is assumed to be the file path.
 
-## Added
+### Added
 
 - `read_relaxation` function
 - `merge_geom_data` function to merge data from .geom file with that from .castep file.
 
 ## [0.1.4] - 2019.08.24
 
-## Changed
+### Changed
 
 - `read_castep_file`, `read_geom_file` and `read_cell_file` now additionally accept input as bytes.
 
 ## [0.1.3] - 2019.08.24
 
-## Changed
+### Changed
 
 - `read_castep_file`, `read_geom_file` and `read_cell_file` now accept any of a file handle, string or Path object.
 
-## Fixed
+### Fixed
 
 - Fix bug with `write_input_files` when `param` argument is missing.
 
