@@ -392,7 +392,7 @@ def read_cell_file(path_or_file, ret_frac=False):
     ----------
     path_or_file : str, Path, bytes or TextIOWrapper
         The input .cell file of the simulation. If type is `str` or `Path`, assumed to be
-        a file path.    
+        a file path.
     ret_frac : bool, optional
         If True, atoms are returned in fractional coordinates.
 
@@ -1403,17 +1403,15 @@ def parse_castep_file_run_stats(stats_str):
     return out
 
 
-def read_den_fmt(path):
+@flexible_open
+def read_den_fmt(path_or_file):
 
     mode = 'scan'
     sup = []
     grid_size = None
     density = []
 
-    with Path(path).open('r') as handle:
-        lines = handle.readlines()
-
-    for ln in lines:
+    for ln in path_or_file:
 
         ln_s = ln.split()
 
@@ -1440,9 +1438,10 @@ def read_den_fmt(path):
             mode = 'density'
 
         elif mode == 'density':
-            idx, dens = ln_s[0:3], float(ln_s[3])
-            idx = tuple([int(i) - 1 for i in idx])
-            density[idx] = dens
+            if ln_s:
+                idx, dens = ln_s[0:3], float(ln_s[3])
+                idx = tuple([int(i) - 1 for i in idx])
+                density[idx] = dens
 
     # Return supercell as matric of column vectors:
     sup = np.array(sup).T
