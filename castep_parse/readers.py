@@ -3,10 +3,16 @@
 import re
 from pathlib import Path
 from warnings import warn
+import warnings
 
 import numpy as np
 
-from castep_parse.utils import find_files_in_dir, flexible_open, map_species_to_castep
+from castep_parse.utils import (
+    find_files_in_dir,
+    flexible_open,
+    map_species_to_castep,
+    merge_str_list,
+)
 
 __all__ = [
     'read_castep_file',
@@ -44,6 +50,17 @@ def read_castep_file(path_or_file):
     file_str = '\n'.join(path_or_file)
 
     header_split = re.split(pat_header, file_str)[1:]
+    runs_list = [''.join(header_split[i:i + 6]) for i in range(0, len(header_split), 6)]
+
+    # Merge DFTP headers if present:
+    dftp_header_idx = []
+    for i in range(0, len(header_split), 6):
+        if '|  D D D D    F F F F F  P P P P     T T T T T    |' in header_split[i + 1]:
+            dftp_header_idx.append(i)
+
+    for i in dftp_header_idx:
+        header_split = merge_str_list(header_split, i - 1, i + 6)
+
     runs_list = [''.join(header_split[i:i + 6]) for i in range(0, len(header_split), 6)]
 
     runs = []
@@ -84,7 +101,7 @@ def read_castep_file(path_or_file):
             t = run['final_info']['statistics']['total_time_s']
             total_time += t
 
-        else:
+        elif 'geom' in run:
             # Add on the last-recorded SCF time (of completed geom iterations):
             all_iters = run['geom']['iterations']
             if all_iters:
@@ -92,8 +109,6 @@ def read_castep_file(path_or_file):
                 if 'scf' in final_step:
                     t = final_step['scf'][-1, -1]
                     total_time += t
-
-        if 'geom' in run:
 
             run_geom_iters = run['geom'].pop('iterations')
 
@@ -700,7 +715,7 @@ def parse_castep_run(run_str, run_idx):
 
     header_split = re.split(pat_header, run_str)
     header_str = ''.join([header_split[i] for i in [1, 2, 3, 4, 5]])
-    remainder_str = header_split[6]
+    remainder_str = header_split[len(header_split) - 1]  # accounts for DFPT header
     header = parse_castep_file_header(header_str)
 
     # TODO: parse pseudopotential section
@@ -839,6 +854,10 @@ def parse_castep_run(run_str, run_idx):
             }
         })
 
+    elif parameters['general_parameters']['type_of_calculation'] == 'Phonon followed by E-field':
+        print('parsign phonon shizz')
+        run_info_str = remainder_str
+
     run_info = parse_castep_file_run_info(run_info_str, parameters)
 
     run.update({'system_info': {k: v for k, v in run_info.items()
@@ -936,6 +955,7 @@ def parse_castep_file_run_info(run_info_str, parameters):
         'cell_contents': parse_castep_file_cell_contents(cell_contents_str, is_initial=True),
         'unit_cell': parse_castep_file_unit_cell(unit_cell_str, is_initial=True),
         'kpoints': parse_castep_file_kpoint_info(kpoints_str),
+        'symmetry': parse_castep_file_symmetry(symm_str)
     }
 
     if len(info_list) == 6:
@@ -985,17 +1005,31 @@ def parse_castep_file_run_info(run_info_str, parameters):
 
 def parse_castep_file_kpoint_info(kpoint_info_str):
 
-    body_str = re.split(r'[^\S\n]+-{31}\n', kpoint_info_str)[2]
+    body_str = re.split(r'[^\S\n]+-{31}|\+{55}\n', kpoint_info_str)[2]
+    # Splitting on "+" is for where there is a k-point table (only earlier versions?)
+
     body_lns = body_str.strip().split('\n')[:3]
 
     lns_s = [ln.strip().split() for ln in body_lns]
 
-    out = {
-        'kpoint_MP_grid': [int(lns_s[0][i]) for i in [-3, -2, -1]],
-        'kpoint_MP_offset': [float(lns_s[1][i]) for i in [-3, -2, -1]],
-        'kpoint_num': int(lns_s[2][-1])
-    }
+    out = {'kpoint_MP_grid': [int(lns_s[0][i]) for i in [-3, -2, -1]]}
+    if len(lns_s) == 3:
+        out.update({
+            'kpoint_MP_offset': [float(lns_s[1][i]) for i in [-3, -2, -1]],
+            'kpoint_num': int(lns_s[2][-1])
+        })
+    else:
+        out.update({'kpoint_num': int(lns_s[1][-1])})
+        warnings.warn('Could not parse kpoint MP grid offset.')
 
+    return out
+
+
+def parse_castep_file_symmetry(sym_str):
+    pnt_group = re.search(r'Point\ group\ of\ crystal\ = (.*)', sym_str).group(1).strip()
+    out = {
+        'point_group': pnt_group,
+    }
     return out
 
 
@@ -1036,12 +1070,15 @@ def parse_castep_file_unit_cell(unit_cell_str, is_initial):
     }
 
     if is_initial:
-        cell_dens_amu_ang = float(lns_s[11][2])
-        cell_dens_g_cm = float(lns_s[12][1])
-        out.update({
-            'cell_density_AMU/Ang**3': cell_dens_amu_ang,
-            'cell_density_g/cm**3': cell_dens_g_cm,
-        })
+        try:
+            cell_dens_amu_ang = float(lns_s[11][2])
+            cell_dens_g_cm = float(lns_s[12][1])
+            out.update({
+                'cell_density_AMU/Ang**3': cell_dens_amu_ang,
+                'cell_density_g/cm**3': cell_dens_g_cm,
+            })
+        except:
+            warnings.warn('Could not parse unit cell densities.')
 
     return out
 
@@ -1068,7 +1105,7 @@ def parse_castep_file_resource_estimates(estimates_str):
     return out
 
 
-def parse_castep_file_cell_contents(cell_contents_str, is_initial, parse_species=False):
+def parse_castep_file_cell_contents(cell_contents_str, is_initial):
 
     if is_initial:
         patt = r'x-{58}x|x{60}'
@@ -1078,13 +1115,21 @@ def parse_castep_file_cell_contents(cell_contents_str, is_initial, parse_species
     single_cell_split = re.split(patt, cell_contents_str)
     cell_lines = single_cell_split[2].strip().split('\n')
     atom_frac_coords = []
+    elements = []
+    atom_numbers = []
     for ln in cell_lines:
         ln_s = ln.strip().split()
+        elements.append(ln_s[1])
+        atom_numbers.append(int(ln_s[2]))
         atom_frac_coords.append([float(ln_s[i]) for i in [3, 4, 5]])
 
-    # TODO atom species
+    out = {
+        'element': np.array(elements),
+        'atom_number': np.array(atom_numbers),
+        'fractional_atom_coords': np.array(atom_frac_coords),
+    }
 
-    return np.array(atom_frac_coords)
+    return out
 
 
 def parse_castep_file_scf(scf_str, is_metallic):
